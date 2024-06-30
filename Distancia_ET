@@ -1,0 +1,72 @@
+import requests
+import urllib.parse
+
+def geocoding(location, key):
+    url = "https://graphhopper.com/api/1/geocode"
+    params = {
+        "q": location,
+        "limit": 1,
+        "key": key
+    }
+    response = requests.get(url, params=params)
+    if response.status_code == 200:
+        data = response.json()
+        if len(data["hits"]) > 0:
+            place = data["hits"][0]
+            json_status = 200
+            lat = place["point"]["lat"]
+            lon = place["point"]["lng"]
+            address = place["name"]
+            return (json_status, lat, lon, address)
+        else:
+            return (404, None, None, None)
+    else:
+        return (response.status_code, None, None, None)
+
+key = "af76eb7a-9203-49eb-8484-0782f0bb3592"  
+route_url = "https://graphhopper.com/api/1/route?"
+
+while True:
+    loc1 = input("Ciudad de Origen: ")
+    if loc1.lower() == "quit" or loc1.lower() == "q":
+        break
+    orig = geocoding(loc1, key)
+    loc2 = input("Ciudad de Destino: ")
+    if loc2.lower() == "quit" or loc2.lower() == "q":
+        break
+    dest = geocoding(loc2, key)
+    
+    if orig[0] == 200 and dest[0] == 200:
+        op = "&point=" + str(orig[1]) + "%2C" + str(orig[2])
+        dp = "&point=" + str(dest[1]) + "%2C" + str(dest[2])
+        paths_url = route_url + urllib.parse.urlencode({"key": key, "vehicle": "car"}) + op + dp
+        paths_response = requests.get(paths_url)
+        paths_status = paths_response.status_code
+        paths_data = paths_response.json()
+        
+        if paths_status == 200:
+            km = (paths_data["paths"][0]["distance"]) / 1000
+            sec = int(paths_data["paths"][0]["time"] / 1000 % 60)
+            min = int(paths_data["paths"][0]["time"] / 1000 / 60 % 60)
+            hr = int(paths_data["paths"][0]["time"] / 1000 / 60 / 60)
+            
+
+
+            print(f"Distancia recorrida: {km:.2f} km")
+            print(f"Duración del viaje: {hr:02d}:{min:02d}:{sec:02d}")
+           
+            print("=================================================")
+            print(f"Instrucciones de viaje desde {orig[3]} hasta {dest[3]}")
+            print("=================================================")
+
+            for each in range(len(paths_data["paths"][0]["instructions"])):
+                path = paths_data["paths"][0]["instructions"][each]["text"]
+                distance = paths_data["paths"][0]["instructions"][each]["distance"]
+                print(f"{path} ( {distance/1000:.2f} km )")
+            print("=================================================")
+        else:
+            print(f"Error: {paths_data['message']}")
+    else:
+        print("Error de geocodificación. Por favor, verifica las ubicaciones.")
+
+    print("\n")
